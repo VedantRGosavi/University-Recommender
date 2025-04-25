@@ -1,23 +1,55 @@
-import logo from './logo.svg';
-import './App.css';
-import {BrowserRouter as Router, Route, Routes} from 'react-router-dom';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { SignedOut, RedirectToSignIn } from '@clerk/clerk-react';
+import { StickyNavbar } from './components/Navbar';
 import { LandingPage } from './components/LandingPage';
 import { ResultsPage } from './components/ResultsPage';
+import { HowItWorks } from './components/HowItWorks';
+import { UniversityDetails } from './components/UniversityDetails';
+import { CompareUniversities } from './components/CompareUniversities';
+import ProtectedRoute from './components/ProtectedRoute';
+import './App.css';
 
 function App() {
   return (
-    <div className="App">
-      <Router>
+    <Router>
+      <div className="App">
+        <StickyNavbar />
         <Routes>
-          <Route path="/" exact element={<LandingPage/>}>
-          </Route>
-          <Route path="/results" exact element={<ResultsPage/>}>
-          </Route>
-          <Route path="/about">
-          </Route>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/how-it-works" element={<HowItWorks />} />
+          
+          {/* Public Results Page */}
+          <Route path="/results" element={<ResultsPage />} />
+          
+          {/* University Details Page */}
+          <Route path="/university/:id" element={<UniversityDetails />} />
+          
+          {/* Compare Universities Page */}
+          <Route path="/compare" element={<CompareUniversities />} />
+          
+          {/* Protected Routes */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <ResultsPage showSavedResults={true} />
+              </ProtectedRoute>
+            }
+          />
+          
+          {/* Sign In Route */}
+          <Route
+            path="/sign-in/*"
+            element={
+              <SignedOut>
+                <RedirectToSignIn />
+              </SignedOut>
+            }
+          />
         </Routes>
-      </Router>
-    </div>
+      </div>
+    </Router>
   );
 }
 

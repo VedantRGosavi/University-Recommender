@@ -1,0 +1,86 @@
+README
+
+Project Title: College Recommendation System
+Description: A brief overview of the project, mentioning that it provides university recommendations using Elasticsearch based on various criteria.
+Technologies Used: List the key technologies:
+Node.js
+Express
+Elasticsearch
+MongoDB
+
+Setup Instructions:
+Prerequisites: Node.js, Elasticsearch (running locally on port 9200), MongoDB (with connection string).
+
+Installation: npm install to install dependencies.
+
+Configuration: Mention environment variables for Elasticsearch credentials (username, password) and MongoDB URI.
+
+Running the Server: node server.js to start the Express server.
+
+Indexing Data: node indexUniversities.js to index university data from MongoDB into Elasticsearch.
+
+
+API Endpoints: Describe the available API endpoints:
+/recommendations: Explain query parameters for filtering recommendations (e.g., avgCostMin, avgCostMax, degreeTypes, etc.) and the structure of the JSON response.
+
+/knn-recommendations: Explain query parameters for KNN-based recommendations (user preference vector parameters) and the response.
+
+/knn-hybrid: Explain query parameters for hybrid KNN and filter-based recommendations.
+
+/universities: Explain parameters for paginated retrieval of university data (page, limit).
+
+
+Indexing Process: Briefly describe how indexUniversities.js indexes data from MongoDB into Elasticsearch, including the data transformations and Elasticsearch index mappings.
+
+
+## **Startup Checklist**
+
+1. **Start MongoDB**  
+   - If you have a local MongoDB service, ensure it’s running.  
+     - On Windows, you can open **Services** (type `services.msc` in the Start menu) and start **MongoDB** if it’s not already running.  
+   - If you’re using **MongoDB Atlas** (cloud), no local service is required—just ensure your connection string is correct.
+
+2. **Start Elasticsearch**  
+   - **Open a Terminal** in the Elasticsearch `bin` folder or wherever you installed Elasticsearch.  
+   - Run:
+     ```bash
+     elasticsearch.bat
+     ```
+     (on Windows) or
+     ```bash
+     ./bin/elasticsearch
+     ```
+     (on macOS/Linux).  
+   - If Elasticsearch is configured with security, it will start on **https://localhost:9200**.  
+   - You can **close the logs window** once you see it has started successfully, but leave Elasticsearch running in the background.
+
+3. **Verify Elasticsearch**  
+   - Open a new Terminal/PowerShell window and run:
+     ```bash
+     curl.exe -k -u "elastic:YOUR_PASSWORD" https://localhost:9200
+     ```
+     (If you’re on PowerShell, `curl.exe` is the real cURL; `-k` ignores certificate issues, and `-u` supplies credentials.)
+   - You should see JSON with `"You Know, for Search"`.
+
+4. **Open VS Code** & Navigate to Your Project  
+   - In the terminal inside VS Code (or any terminal in your project folder), run:
+     ```bash
+     cd "C:\Users\mutha\OneDrive - University of Toledo\Desktop\Elastic Search\college-recommendation"
+     ```
+   - You can now run your Node.js scripts.
+
+5. **Run Your Node.js Scripts**  
+   - **Indexing Script** (if you need to re-index):  
+     ```bash
+     node indexUniversities.js
+     ```
+   - **Recommendation Script** (to test queries):  
+     ```bash
+     node recommendations.js
+     ```
+
+6. **Check MongoDB (Optional)**  
+   - If you have **MongoDB Compass**, open it to view your “unis” database and “universities” collection.  
+   - Confirm your data is present.
+
+At this point, your environment is up and running.

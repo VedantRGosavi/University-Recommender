@@ -1,5 +1,5 @@
 import axios from "axios";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -75,17 +75,17 @@ export const ResultsPage = () => {
     const handleSliderChange = (e) => {
       setCareerWeight(parseFloat(e.target.value));
     };
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const response = await axios.post(
-        "https://unimatch-backend.onrender.com/api/universities",
+        "http://localhost:5001/api/universities",
         query
       );
       setUnis(response.data);
     } catch (error) {
       console.error("Error fetching data:", error);
     }
-  };
+  }, [query]);
   useEffect(() => {
     if (query) {
       Object.entries(query).forEach(([key, value]) => {
@@ -93,7 +93,7 @@ export const ResultsPage = () => {
       });
     }
     fetchData();
-  }, [query, setValue]);
+  }, [query, setValue, fetchData]);
 
   return (
     <div>
@@ -171,13 +171,13 @@ export const ResultsPage = () => {
       >
         <div class="relative bg-blue-700 flex flex-col h-full max-h-full">
           <div class="px-6 pt-4 mt-14">
-            <a
-              class="flex-none text-white rounded-xl text-2xl inline-block font-bold focus:outline-none focus:opacity-80"
-              href="#"
-              aria-label="Preline"
+            <button
+              className="flex-none text-white rounded-xl text-2xl inline-block font-bold focus:outline-none focus:opacity-80"
+              type="button"
+              aria-label="Parameters"
             >
               Parameters
-            </a>
+            </button>
           </div>
           <div class="h-full overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
             <nav
@@ -328,9 +328,9 @@ export const ResultsPage = () => {
         </h1>
         <div className="mt-5 ms-2 flex flex-col gap-5">
           {unis.map((uni, idx) => (
-            <a
+            <button
               key={idx}
-              href="#"
+              type="button"
               className="flex relative overflow-visible min-w-[800px] mx-4 h-fit items-center bg-white border border-gray-200 rounded-lg shadow flex-row hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700"
             >
               <span className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 bg-white m-1 text-blue-600 ring ring-blue-600 rounded-full text-lg items-start font-medium w-8 h-8">
@@ -416,7 +416,7 @@ export const ResultsPage = () => {
                   ))}
                 </div>
               </div>
-            </a>
+            </button>
           ))}
         </div>
       </div>

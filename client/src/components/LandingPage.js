@@ -1,7 +1,5 @@
 import React from "react";
 import { useForm } from "react-hook-form";
-import { StickyNavbar } from "./Narbar";
-import { select, option, Button, input } from "@material-tailwind/react";
 import img from "../res/landingPage.png";
 import { useNavigate } from "react-router-dom";
 
@@ -20,7 +18,6 @@ export const LandingPage = () => {
   };
   return (
     <div class="max-h-screen">
-      <StickyNavbar />
       <div class="grid md:grid-cols-2 gap-2 xl:gap-10 md:items-center mt-10">
         <div>
           <h1 class="block text-xl font-bold text-gray-800 sm:text-4xl lg:text-5xl lg:leading-tight">
@@ -143,7 +140,7 @@ export const LandingPage = () => {
                         >
                           I agree with the{" "}
                           <a
-                            href="#"
+                            href="/terms-and-conditions"
                             class="text-blue-600 dark:text-blue-500 hover:underline"
                           >
                             terms and conditions
