@@ -49,6 +49,21 @@ export function StickyNavbar() {
             <MenuItem><Link to="/search/career" className="w-full">Search by Career</Link></MenuItem>
           </MenuList>
         </Menu>
+        <Menu>
+          <MenuHandler>
+            <button className="flex items-center hover:text-blue-600 transition-colors gap-1">
+              Features
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          </MenuHandler>
+          <MenuList>
+            <MenuItem><Link to="/campus-culture" className="w-full">Campus Culture</Link></MenuItem>
+            <MenuItem><Link to="/academic-path" className="w-full">Academic Path</Link></MenuItem>
+            <MenuItem><Link to="/integration" className="w-full">Application Tracking</Link></MenuItem>
+          </MenuList>
+        </Menu>
         <Link to="/compare" className="flex items-center hover:text-blue-600 transition-colors">
           Compare Universities
         </Link>
@@ -78,6 +93,15 @@ export function StickyNavbar() {
         </Link>
         <Link to="/search/career" className="flex items-center hover:text-blue-600 transition-colors">
           Search by Career
+        </Link>
+        <Link to="/campus-culture" className="flex items-center hover:text-blue-600 transition-colors">
+          Campus Culture
+        </Link>
+        <Link to="/academic-path" className="flex items-center hover:text-blue-600 transition-colors">
+          Academic Path
+        </Link>
+        <Link to="/integration" className="flex items-center hover:text-blue-600 transition-colors">
+          Application Tracking
         </Link>
         <Link to="/compare" className="flex items-center hover:text-blue-600 transition-colors">
           Compare Universities

@@ -9,6 +9,10 @@ import { UniversityDetails } from './components/UniversityDetails';
 import { CompareUniversities } from './components/CompareUniversities';
 import { CampusMapsPage } from './components/CampusMapsPage';
 import ProtectedRoute from './components/ProtectedRoute';
+import CampusCulturePage from './components/CampusCulturePage';
+import AcademicPathPage from './components/AcademicPathPage';
+import IntegrationFeaturesPage from './components/IntegrationFeaturesPage';
+import NotFound from './components/NotFound';
 import './App.css';
 
 function App() {
@@ -56,6 +60,14 @@ function App() {
               </SignedOut>
             }
           />
+          
+          {/* New Phase 2 Feature Routes */}
+          <Route path="/campus-culture" element={<CampusCulturePage />} />
+          <Route path="/academic-path" element={<AcademicPathPage />} />
+          <Route path="/integration" element={<IntegrationFeaturesPage />} />
+          
+          {/* 404 Not Found Route - Must be last */}
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </div>
     </Router>
