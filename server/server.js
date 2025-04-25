@@ -1,33 +1,30 @@
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
  
 const express = require('express');
-const { Client } = require('@elastic/elasticsearch');
- 
 const app = express();
 const cors = require('cors');
+const { getRecommendations, getSimilarUniversities, getSATRangeMatches } = require('./recommendations');
+const { calculateOverallScore } = require('./helper');
+
 app.use(cors());
-app.use(express.json());  // Add JSON body parsing
- 
+app.use(express.json());
+
 const port = process.env.PORT || 5001;
- 
-// Elasticsearch client configuration
-const esClient = new Client({
-  node: 'https://localhost:9200',
-  auth: {
-    username: 'elastic',
-    password: '8d3Vcwhx4ya_DjEtyQsQ'
-  },
-  ssl: { rejectUnauthorized: false }
-});
- 
+
 // Create index with mappings if it doesn't exist
 async function createIndexIfNotExists() {
   try {
-    const exists = await esClient.indices.exists({ index: 'universities' });
-    if (!exists.body) {
-      await esClient.indices.create({
+    // Using MCP Elasticsearch search to check if index exists
+    try {
+      await mcp_elasticsearch_search({
         index: 'universities',
-        body: {
+        queryBody: { query: { match_all: {} }, size: 1 }
+      });
+      console.log('Index "universities" already exists.');
+    } catch (error) {
+      if (error.message.includes('index_not_found_exception')) {
+        // Create index with mappings
+        const mapping = {
           settings: {
             analysis: {
               normalizer: {
@@ -73,8 +70,8 @@ async function createIndexIfNotExists() {
               graduation_rate_display: { type: 'keyword' },
               SATMAT25: { type: 'double' },
               SATMAT75: { type: 'double' },
-              SATVR25:  { type: 'double' },
-              SATVR75:  { type: 'double' },
+              SATVR25: { type: 'double' },
+              SATVR75: { type: 'double' },
               preference_vector: {
                 type: 'dense_vector',
                 dims: 12,
@@ -83,145 +80,296 @@ async function createIndexIfNotExists() {
               }
             }
           }
-        }
-      });
-      console.log('Created index "universities" with extended mapping.');
-    } else {
-      console.log('Index "universities" already exists.');
+        };
+
+        // Create index using MCP Elasticsearch
+        await mcp_elasticsearch_create_index({
+          index: 'universities',
+          body: mapping
+        });
+        console.log('Created index "universities" with extended mapping.');
+      }
     }
   } catch (err) {
     console.error('Error checking/creating index:', err);
   }
 }
- 
+
 app.get('/knn-recommendations', async (req, res) => {
   try {
     const userSATV = Number(req.query.SATV || req.query.SATVR75);
     const userSATM = Number(req.query.SATM || req.query.SATMAT75);
     console.log("✅ Received SAT scores → Verbal:", userSATV, "Math:", userSATM);
- 
-    const careerWeight = Number(req.query.careerWeight) || 0.3; // default to 0.3 if not provided
-    const sportsWeight = Number(req.query.sportsWeight) || 0.2; // default to 0.2 if not provided
-    const careerField = req.query.Career; // e.g., 'ComputerSci'
-    const sportsField = req.query.Sports; // e.g., 'Basketball'
- 
-    const careerRankField = {
-      ComputerSci: 'computerScienceRank',
-      Engineering: 'engineeringRank',
-      Business: 'businessRank',
-      Nursing: 'nursingRank',
-      Psychology: 'psychologyRank'
-    }[careerField];
- 
-    const sportsRankField = {
-      Basketball: 'basketballRank',
-      Soccer: 'soccerRank'
-    }[sportsField];
- 
-    const esQuery = {
-      index: 'universities',
-      body: {
-        size: 10,
-        query: {
-          function_score: {
-            score_mode: 'sum',
-            boost_mode: 'replace',
-            functions: [
-              {
-                script_score: {
-                  script: {
-                    source: `
-                    double get(Map d, String f) {
-                      return (d.containsKey(f) && d[f].size()!=0) ? d[f].value : -1;
-                    }
 
-                    double minM = get(doc, 'SATMAT25');
-                    double maxM = get(doc, 'SATMAT75');
-                    double minV = get(doc, 'SATVR25');
-                    double maxV = get(doc, 'SATVR75');
+    const careerWeight = Number(req.query.careerWeight) || 0.3;
+    const sportsWeight = Number(req.query.sportsWeight) || 0.2;
+    const careerField = req.query.Career;
+    const sportsField = req.query.Sports;
 
-                    if (minM < 0 || maxM <= minM || minV < 0 || maxV <= minV) return 0.01;
+    const results = await getSATRangeMatches({
+      satMath: userSATM,
+      satVerbal: userSATV,
+      careerField,
+      careerWeight,
+      sportsField,
+      sportsWeight,
+      size: 15
+    });
 
-                    double midM  = (minM + maxM) / 2.0;
-                    double spanM = (maxM - minM) / 2.0;
-                    double midV  = (minV + maxV) / 2.0;
-                    double spanV = (maxV - minV) / 2.0;
-
-                    double dM = Math.abs(params.uM - midM) / spanM;     // 0 = centre, 1 = edge
-                    double dV = Math.abs(params.uV - midV) / spanV;
-
-                    double compM = 1.0 - Math.min(dM, 1.0);             // floor at 0
-                    double compV = 1.0 - Math.min(dV, 1.0);
-
-                    return ((compM + compV) / 2.0) * 100;               // 0 – 100
-                    `,
-                    params: {
-                      uM: userSATM,   // Math that came in on the query string
-                      uV: userSATV    // Verbal
-                    }
-                  }
-                },
-                weight: 1.0
-              },
-              {
-                field_value_factor: {
-                  field: 'rankNumber',
-                  modifier: 'reciprocal',      // lower rank ⇒ bigger bonus
-                  missing: 9999                // if no rank, tiny bonus
-                },
-                weight: 0.05                   // gentle tie-breaker
-              },
-              careerRankField && {
-                field_value_factor: {
-                  field: careerRankField,
-                  modifier: 'reciprocal',
-                  missing: 999
-                },
-                weight: 0.2
-              },
-              sportsRankField && {
-                field_value_factor: {
-                  field: sportsRankField,
-                  modifier: 'reciprocal',
-                  missing: 999
-                },
-                weight: 0.01
-              }
-            ].filter(Boolean)
-          }
-        }
-      }
-    };
-
-    const maxResults = 15; // maximum number of unique universities to return
-    const result = await esClient.search(esQuery);
-    const hits = result.hits.hits;
- 
+    const maxResults = 15;
     const uniqueUniversities = [];
     const seen = new Set();
-    for (const hit of hits) {
+
+    for (const hit of results) {
       const uni = hit._source;
-      console.log(`${uni.name} — score: ${hit._score}`);
-      const key = uni.name; // or use `uni.id` if available
-      const score = hit._score;
-      if (uni.name.toLowerCase().includes("stanford")) {
-        console.log("🔍 Stanford debug →", JSON.stringify(uni, null, 2));
-      }
- 
-      console.log(`${uni.name} — score: ${score}`);
- 
+      const key = uni.name;
+      
       if (!seen.has(key)) {
         seen.add(key);
         uniqueUniversities.push(uni);
       }
- 
+
       if (seen.size >= maxResults) break;
     }
- 
+
     res.json({ recommendations: uniqueUniversities.slice(0, maxResults) });
   } catch (error) {
-    console.error('❌ Error in /knn-recommendations:');
-    console.error("Elastic error body:", JSON.stringify(error.meta?.body?.error, null, 2));
+    console.error('❌ Error in /knn-recommendations:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      details: error.message
+    });
+  }
+});
+
+// Enhanced API endpoint for filtered recommendations
+app.post('/api/filtered-recommendations', async (req, res) => {
+  try {
+    const {
+      location,
+      maxRank,
+      minGraduationRate,
+      maxCost,
+      isPublic,
+      urbanicity,
+      majorInterests = []
+    } = req.body;
+
+    const results = await getRecommendations({
+      location,
+      maxRank,
+      minGraduationRate,
+      maxCost,
+      isPublic,
+      urbanicity,
+      majorInterests,
+      size: 15
+    });
+
+    const universities = results.map(hit => hit._source);
+    res.json({ recommendations: universities });
+  } catch (error) {
+    console.error('Error fetching filtered recommendations:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      details: error.message
+    });
+  }
+});
+
+// API endpoint to get similar universities
+app.get('/api/similar-universities/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const size = Number(req.query.size) || 5;
+
+    const results = await getSimilarUniversities({
+      universityId: id,
+      size
+    });
+
+    const similarUniversities = results.map(hit => hit._source);
+    res.json({ similarUniversities });
+  } catch (error) {
+    console.error('Error fetching similar universities:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      details: error.message
+    });
+  }
+});
+
+// API endpoint for advanced matching with overall scores
+app.post('/api/advanced-match', async (req, res) => {
+  try {
+    const userPreferences = req.body;
+    
+    // Validate required fields
+    if (!userPreferences) {
+      return res.status(400).json({ error: 'User preferences are required' });
+    }
+    
+    // Build query to get universities
+    let query = { match_all: {} };
+    let filterClauses = [];
+    
+    // Apply any filters if provided
+    if (userPreferences.maxCost) {
+      filterClauses.push({ range: { avg_annual_cost: { lte: Number(userPreferences.maxCost) } } });
+    }
+    
+    if (userPreferences.minGraduationRate) {
+      filterClauses.push({ 
+        range: { 
+          graduation_rate: { 
+            gte: Number(userPreferences.minGraduationRate) / 100 
+          } 
+        } 
+      });
+    }
+    
+    if (userPreferences.isPublic !== undefined) {
+      filterClauses.push({ term: { public: userPreferences.isPublic } });
+    }
+    
+    if (userPreferences.urbanicity) {
+      filterClauses.push({ term: { urbanicity: userPreferences.urbanicity.toLowerCase() } });
+    }
+    
+    // Add filters to query if any
+    if (filterClauses.length > 0) {
+      query = {
+        bool: {
+          must: [{ match_all: {} }],
+          filter: filterClauses
+        }
+      };
+    }
+    
+    // Get universities that match filters
+    const result = await mcp_elasticsearch_search({
+      index: 'universities',
+      queryBody: {
+        query,
+        size: 50 // Get more results than needed for better matching
+      }
+    });
+    
+    // Calculate match scores for each university
+    const scoredUniversities = result.hits.hits.map(hit => {
+      const university = hit._source;
+      const matchScore = calculateOverallScore({
+        satVerbal: userPreferences.SATV,
+        satMath: userPreferences.SATM,
+        maxBudget: userPreferences.maxCost,
+        careerInterest: userPreferences.Career
+      }, university);
+      
+      return {
+        ...university,
+        matchScore
+      };
+    });
+    
+    // Sort by match score (descending)
+    scoredUniversities.sort((a, b) => b.matchScore - a.matchScore);
+    
+    // Return top 15 matches
+    res.json({ 
+      recommendations: scoredUniversities.slice(0, 15),
+      totalMatches: scoredUniversities.length
+    });
+    
+  } catch (error) {
+    console.error('Error in advanced matching:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      details: error.message
+    });
+  }
+});
+
+// API endpoint to get university details by ID
+app.get('/api/university/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await mcp_elasticsearch_search({
+      index: 'universities',
+      queryBody: {
+        query: {
+          term: { _id: id }
+        }
+      }
+    });
+
+    if (result.hits.hits.length === 0) {
+      return res.status(404).json({ error: 'University not found' });
+    }
+
+    const university = result.hits.hits[0]._source;
+    
+    // Get similar universities for this university
+    const similarResults = await getSimilarUniversities({
+      universityId: id,
+      size: 3
+    });
+    
+    const similarUniversities = similarResults.map(hit => ({
+      id: hit._id,
+      name: hit._source.name,
+      rank: hit._source.rank,
+      location: hit._source.location,
+      image: hit._source.images?.thumb || hit._source.images?.medium
+    }));
+
+    res.json({
+      ...university,
+      similarUniversities
+    });
+  } catch (error) {
+    console.error('Error fetching university details:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      details: error.message
+    });
+  }
+});
+
+// API endpoint for map data
+app.get('/api/university/:id/map', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await mcp_elasticsearch_search({
+      index: 'universities',
+      queryBody: {
+        query: {
+          term: { _id: id }
+        }
+      }
+    });
+
+    if (result.hits.hits.length === 0) {
+      return res.status(404).json({ error: 'University not found' });
+    }
+
+    const university = result.hits.hits[0]._source;
+    
+    // Return map data
+    // Since we don't want to add new fields to the schema, we'll use the university name and location
+    // for geocoding on the client side
+    res.json({
+      name: university.name,
+      location: university.location,
+      // Using University of Toledo as default fallback coordinates
+      fallbackCoordinates: {
+        lng: -83.606667,
+        lat: 41.658889
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching university map data:', error);
     res.status(500).json({
       error: 'Internal Server Error',
       details: error.message
@@ -232,12 +380,10 @@ app.get('/knn-recommendations', async (req, res) => {
 app.post('/api/universities', async (req, res) => {
   try {
     const query = req.body;
-    const result = await esClient.search({
+    const result = await mcp_elasticsearch_search({
       index: 'universities',
-      body: {
-        query: {
-          match_all: {}  // For now, return all universities. We'll implement filtering later.
-        },
+      queryBody: {
+        query: query.searchQuery || { match_all: {} },
         size: 10
       }
     });
@@ -252,14 +398,49 @@ app.post('/api/universities', async (req, res) => {
     });
   }
 });
- 
-// Initialize server
-(async () => {
-  await createIndexIfNotExists();
-  app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
-  });
-})();
+
+// API endpoint for searching universities by location
+app.get('/api/universities/search/location', async (req, res) => {
+  try {
+    const { query } = req.query;
+    
+    const result = await mcp_elasticsearch_search({
+      index: 'universities',
+      queryBody: {
+        query: {
+          multi_match: {
+            query: query,
+            fields: ['location^2', 'name'],
+            type: 'best_fields',
+            fuzziness: 'AUTO'
+          }
+        },
+        size: 20,
+        sort: [
+          { rankNumber: { order: 'asc' } }
+        ]
+      }
+    });
+
+    const universities = result.hits.hits.map(hit => ({
+      ...hit._source,
+      id: hit._id
+    }));
+
+    res.json(universities);
+  } catch (error) {
+    console.error('Error searching universities by location:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      details: error.message
+    });
+  }
+});
+
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+  createIndexIfNotExists();
+});
 
 // Commented out delete index endpoint for safety
 /*

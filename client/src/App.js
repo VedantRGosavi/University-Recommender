@@ -7,6 +7,7 @@ import { ResultsPage } from './components/ResultsPage';
 import { HowItWorks } from './components/HowItWorks';
 import { UniversityDetails } from './components/UniversityDetails';
 import { CompareUniversities } from './components/CompareUniversities';
+import { CampusMapsPage } from './components/CampusMapsPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import './App.css';
 
@@ -27,6 +28,14 @@ function App() {
           
           {/* Compare Universities Page */}
           <Route path="/compare" element={<CompareUniversities />} />
+          
+          {/* Campus Maps Page */}
+          <Route path="/campus-maps" element={<CampusMapsPage />} />
+          
+          {/* Advanced Search Routes */}
+          <Route path="/advanced-search" element={<ResultsPage showAdvancedOptions={true} />} />
+          <Route path="/search/sat" element={<ResultsPage showSATOptions={true} />} />
+          <Route path="/search/career" element={<ResultsPage showCareerOptions={true} />} />
           
           {/* Protected Routes */}
           <Route

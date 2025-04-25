@@ -5,6 +5,10 @@ import {
   Typography,
   Button,
   IconButton,
+  Menu,
+  MenuHandler,
+  MenuList,
+  MenuItem
 } from "@material-tailwind/react";
 import { Link } from "react-router-dom";
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/clerk-react";
@@ -30,11 +34,56 @@ export function StickyNavbar() {
         <Link to="/how-it-works" className="flex items-center hover:text-blue-600 transition-colors">
           How it works
         </Link>
+        <Menu>
+          <MenuHandler>
+            <button className="flex items-center hover:text-blue-600 transition-colors gap-1">
+              Search
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          </MenuHandler>
+          <MenuList>
+            <MenuItem><Link to="/advanced-search" className="w-full">Advanced Search</Link></MenuItem>
+            <MenuItem><Link to="/search/sat" className="w-full">Search by SAT Score</Link></MenuItem>
+            <MenuItem><Link to="/search/career" className="w-full">Search by Career</Link></MenuItem>
+          </MenuList>
+        </Menu>
         <Link to="/compare" className="flex items-center hover:text-blue-600 transition-colors">
           Compare Universities
         </Link>
-        <Link to="/university/1" className="flex items-center hover:text-blue-600 transition-colors">
-          University Details
+        <Link to="/campus-maps" className="flex items-center hover:text-blue-600 transition-colors">
+          Campus Maps
+        </Link>
+      </Typography>
+    </ul>
+  );
+
+  const mobileNavList = (
+    <ul className="mt-2 mb-4 flex flex-col gap-2 lg:mb-0 lg:mt-0 lg:flex-row lg:items-center lg:gap-6">
+      <Typography
+        as="li"
+        variant="small"
+        color="blue-gray"
+        className="p-1 font-semibold text-lg flex flex-col gap-4"
+      >
+        <Link to="/how-it-works" className="flex items-center hover:text-blue-600 transition-colors">
+          How it works
+        </Link>
+        <Link to="/advanced-search" className="flex items-center hover:text-blue-600 transition-colors">
+          Advanced Search
+        </Link>
+        <Link to="/search/sat" className="flex items-center hover:text-blue-600 transition-colors">
+          Search by SAT Score
+        </Link>
+        <Link to="/search/career" className="flex items-center hover:text-blue-600 transition-colors">
+          Search by Career
+        </Link>
+        <Link to="/compare" className="flex items-center hover:text-blue-600 transition-colors">
+          Compare Universities
+        </Link>
+        <Link to="/campus-maps" className="flex items-center hover:text-blue-600 transition-colors">
+          Campus Maps
         </Link>
       </Typography>
     </ul>
@@ -110,7 +159,7 @@ export function StickyNavbar() {
           </div>
         </div>
         <MobileNav open={openNav}>
-          {navList}
+          {mobileNavList}
           <div className="flex items-center gap-x-1">
             <SignedOut>
               <SignInButton mode="modal">

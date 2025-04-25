@@ -200,8 +200,7 @@ async function createIndexIfNotExists() {
                 fields: {
                   keyword: { type: 'keyword' }  // For sorting
                 }
-              }
-              ,
+              },
               public: { type: 'boolean' },
               location: { type: 'text' },
               rank: { type: 'keyword' },
@@ -227,7 +226,10 @@ async function createIndexIfNotExists() {
               psychologyRank: { type: 'integer' },
               images: { type: 'object' },
               graduation_rate_display: { type: 'keyword' },
-              // ✅ NEW VECTOR FIELD
+              SATMAT25: { type: 'double' },
+              SATMAT75: { type: 'double' },
+              SATVR25: { type: 'double' },
+              SATVR75: { type: 'double' },
               preference_vector: {
                 type: 'dense_vector',
                 dims: 12,
@@ -261,73 +263,66 @@ async function indexUniversities() {
 
     const cursor = collection.find({});
     let count = 0;
+    let batch = [];
+    const BATCH_SIZE = 50;
+
     while (await cursor.hasNext()) {
       const doc = await cursor.next();
       const rankNumber = extractRankNumber(doc.rank);
 
-      // ✅ Build the 12-dimensional preference vector
-      const preferenceVector = [
-        rankNumber ?? 999,
-        Number(doc.SATMAT75) || 0,
-        Number(doc.SATVR75) || 0,
-        Number(doc.engineeringRank) || 999,
-        Number(doc.businessRank) || 999,
-        Number(doc.computerScienceRank) || 999,
-        Number(doc.nursingRank) || 999,
-        Number(doc.psychologyRank) || 999,
-        Number(doc.soccerRank) || 999,
-        Number(doc.basketballRank) || 999,
-        Number(doc.median_earnings) || 0,
-        Number(doc.graduation_rate) || 0.4
-      ];
-
+      // Build the document to be indexed
       const esDoc = {
         name: doc.name,
         public: doc.public,
         location: doc.location,
         rank: doc.rank,
-        rankNumber,
+        rankNumber: rankNumber,
         isLiberal: doc.isLiberal,
         avg_annual_cost: doc.avg_annual_cost ? Number(doc.avg_annual_cost) : null,
-        degree_types: doc.degree_types && doc.degree_types.length > 0
-          ? doc.degree_types
-          : ["Bachelor's Degree", "Master's Degree", "Doctoral Degree"],
-        graduation_rate: doc.graduation_rate !== undefined && doc.graduation_rate !== null
-          ? Number(doc.graduation_rate)
-          : 0.4,
+        degree_types: doc.degree_types && doc.degree_types.length > 0 ? doc.degree_types : ["Bachelor's Degree", "Master's Degree", "Doctoral Degree"],
+        graduation_rate: doc.graduation_rate !== undefined && doc.graduation_rate !== null ? Number(doc.graduation_rate) : 0.4,
         median_earnings: doc.median_earnings ? Number(doc.median_earnings) : 0,
         school_size: doc.school_size ? Number(doc.school_size) : 0,
         school_type: doc.school_type || null,
         urbanicity: doc.urbanicity || null,
-        computerScienceRank: Number(doc.computerScienceRank) || null,
-        aerospaceRanking: Number(doc.aerospaceRanking) || null,
-        artificialIntelligenceRank: Number(doc.artificialIntelligenceRank) || null,
-        businessRank: Number(doc.businessRank) || null,
-        nursingRank: Number(doc.nursingRank) || null,
-        engineeringRank: Number(doc.engineeringRank) || null,
-        economicsRank: Number(doc.economicsRank) || null,
-        financeRank: Number(doc.financeRank) || null,
-        managementRank: Number(doc.managementRank) || null,
-        marketingRank: Number(doc.marketingRank) || null,
-        psychologyRank: Number(doc.psychologyRank) || null,
+        computerScienceRank: doc.computerScienceRank ? Number(doc.computerScienceRank) : null,
+        aerospaceRanking: doc.aerospaceRanking ? Number(doc.aerospaceRanking) : null,
+        artificialIntelligenceRank: doc.artificialIntelligenceRank ? Number(doc.artificialIntelligenceRank) : null,
+        businessRank: doc.businessRank ? Number(doc.businessRank) : null,
+        nursingRank: doc.nursingRank ? Number(doc.nursingRank) : null,
+        engineeringRank: doc.engineeringRank ? Number(doc.engineeringRank) : null,
+        economicsRank: doc.economicsRank ? Number(doc.economicsRank) : null,
+        financeRank: doc.financeRank ? Number(doc.financeRank) : null,
+        managementRank: doc.managementRank ? Number(doc.managementRank) : null,
+        marketingRank: doc.marketingRank ? Number(doc.marketingRank) : null,
+        psychologyRank: doc.psychologyRank ? Number(doc.psychologyRank) : null,
         images: doc.images || {},
-        graduation_rate_display: doc.graduation_rate !== undefined && doc.graduation_rate !== null
-          ? (Number(doc.graduation_rate) * 100).toFixed(0) + "%"
-          : "N/A",
-        preference_vector: preferenceVector // ✅ Add vector here
+        graduation_rate_display: doc.graduation_rate !== undefined && doc.graduation_rate !== null ? (Number(doc.graduation_rate)*100).toFixed(0) + "%" : "N/A",
+        SATMAT25: doc.SATMAT25 ? Number(doc.SATMAT25) : null,
+        SATMAT75: doc.SATMAT75 ? Number(doc.SATMAT75) : null,
+        SATVR25: doc.SATVR25 ? Number(doc.SATVR25) : null,
+        SATVR75: doc.SATVR75 ? Number(doc.SATVR75) : null,
+        // Generate a random preference vector for testing
+        preference_vector: Array.from({length: 12}, () => Math.random())
       };
 
-      await esClient.index({
-        index: 'universities',
-        document: esDoc
-      });
+      try {
+        await esClient.index({
+          index: 'universities',
+          document: esDoc
+        });
 
-      count++;
-      if (count % 50 === 0) {
-        console.log(`${count} documents indexed...`);
+        count++;
+        if (count % 10 === 0) {
+          console.log(`Indexed ${count} documents...`);
+        }
+      } catch (error) {
+        console.error('Error indexing document:', error);
+        console.error('Failed document:', doc.name);
       }
     }
 
+    // Refresh the index to make documents searchable immediately
     await esClient.indices.refresh({ index: 'universities' });
     console.log(`Indexing complete. Total documents indexed: ${count}`);
   } catch (error) {
@@ -337,4 +332,5 @@ async function indexUniversities() {
   }
 }
 
+// Run the indexing process
 indexUniversities();
